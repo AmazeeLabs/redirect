@@ -1121,7 +1121,29 @@ function redirect_redirect($redirect = NULL) {
  */
 function redirect_goto($redirect) {
   $redirect->redirect_options['absolute'] = TRUE;
-  $url = url($redirect->redirect, $redirect->redirect_options);
+  if (file_exists(DRUPAL_ROOT . '/' . $redirect->redirect)) {
+    // If we deal with file, construct URL in the same way as it's done in the
+    // file_create_url(), but process other options too, for example, query
+    // parameters.
+    /* @see file_create_url() */
+    $url = url($GLOBALS['base_url'] . '/' . drupal_encode_path($redirect->redirect), array('external' => TRUE) + $redirect->redirect_options);
+  }
+  elseif (file_exists(DRUPAL_ROOT . '/' . rawurldecode($redirect->redirect))) {
+    // It might happen that file path is already encoded. In this case we do the
+    // same as above, but not encode the file path.
+    // The reason of this inconsistent behavior is that browsers may behave
+    // different when you copy URL from the navigation bar. For example, if you
+    // copy the following URL
+    // "http:/example.com/sites/default/files/file(1).jpg"
+    // in Firefox, it becomes
+    // "http://example.com/sites/default/files/file%281%29.jpg"
+    // in the clipboard, but if you do it in Chromium it remains
+    // "http:/example.com/sites/default/files/file(1).jpg"
+    $url = url($GLOBALS['base_url'] . '/' . $redirect->redirect, array('external' => TRUE) + $redirect->redirect_options);
+  }
+  else {
+    $url = url($redirect->redirect, $redirect->redirect_options);
+  }
   drupal_add_http_header('Location', $url);
   drupal_add_http_header('Status', redirect_status_code_options($redirect->status_code));
 
