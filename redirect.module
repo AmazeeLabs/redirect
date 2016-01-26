@@ -1128,19 +1128,6 @@ function redirect_goto($redirect) {
     /* @see file_create_url() */
     $url = url($GLOBALS['base_url'] . '/' . drupal_encode_path($redirect->redirect), array('external' => TRUE) + $redirect->redirect_options);
   }
-  elseif (file_exists(DRUPAL_ROOT . '/' . rawurldecode($redirect->redirect))) {
-    // It might happen that file path is already encoded. In this case we do the
-    // same as above, but not encode the file path.
-    // The reason of this inconsistent behavior is that browsers may behave
-    // different when you copy URL from the navigation bar. For example, if you
-    // copy the following URL
-    // "http:/example.com/sites/default/files/file(1).jpg"
-    // in Firefox, it becomes
-    // "http://example.com/sites/default/files/file%281%29.jpg"
-    // in the clipboard, but if you do it in Chromium it remains
-    // "http:/example.com/sites/default/files/file(1).jpg"
-    $url = url($GLOBALS['base_url'] . '/' . $redirect->redirect, array('external' => TRUE) + $redirect->redirect_options);
-  }
   else {
     $url = url($redirect->redirect, $redirect->redirect_options);
   }
@@ -1366,7 +1353,7 @@ function redirect_language_load($language = LANGUAGE_NONE) {
 }
 
 /**
- * Build the URL of a redirect for display purposes only.
+ * Build the URL of a redirect for display/edit purposes only.
  */
 function redirect_url($path, array $options = array(), $clean_url = NULL) {
   if (!isset($clean_url)) {
@@ -1398,11 +1385,16 @@ function redirect_url($path, array $options = array(), $clean_url = NULL) {
     }
   }
 
-  if (empty($options['absolute']) || url_is_external($path)) {
+  // If we deal with internal Drupal path, it should be URL-encoded, so we have
+  // the same behavior as with absolute URLs.
+  if (url_is_external($path)) {
     $url = $path;
   }
+  elseif (empty($options['absolute'])) {
+    $url = drupal_encode_path($path);
+  }
   else {
-    $url = $options['base_url'] . base_path() . $path;
+    $url = $options['base_url'] . base_path() . drupal_encode_path($path);
   }
 
   if (isset($options['query'])) {
