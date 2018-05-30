@@ -222,3 +222,10 @@ function redirect_update_8108() {
   $config->clear('content_location_header');
   $config->save();
 }
+
+/**
+ * Rehash redirects to account for query case insensitivity.
+ */
+function redirect_update_8109(&$sandbox) {
+  redirect_update_8100($sandbox);
+}

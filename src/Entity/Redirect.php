@@ -67,7 +67,19 @@ class Redirect extends ContentEntityBase {
     );
 
     if (!empty($source_query)) {
-      $hash['source_query'] = $source_query;
+      $lowercase = function ($source) use(&$lowercase) {
+        $lowercased = [];
+        array_walk($source, function($value, $key) use(&$lowercased, &$lowercase) {
+          if (is_array($value)) {
+            $lowercased[Unicode::strtolower($key)] = $lowercase($value);
+          }
+          else {
+            $lowercased[Unicode::strtolower($key)] = Unicode::strtolower($value);
+          }
+        });
+        return $lowercased;
+      };
+      $hash['source_query'] = $lowercase($source_query);
     }
     redirect_sort_recursive($hash, 'ksort');
     return Crypt::hashBase64(serialize($hash));
