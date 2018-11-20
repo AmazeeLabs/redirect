@@ -1661,6 +1661,104 @@ function redirect_get_redirect_operations() {
 }
 
 /**
+ * Returns "Drupal path" for a file URI.
+ *
+ * One way to get "Drupal path" for a file, would be to use file_create_url().
+ * This function returns absolute URL, so we would need to
+ * - Strip the $base_url from it.
+ * - Get rid of language prefix, if any.
+ * - Get rid of any other path processing consequences, because it is better to
+ *   use source path for creating redirects, rather than path alias.
+ * - URL-decode the resulting part, because we need non-encoded paths to create
+ *   redirects.
+ *
+ * This can be too complex, so here the task is done in the opposite way. We use
+ * a bit modified version of \DrupalStreamWrapperInterface::getExternalUrl()
+ * code.
+ *
+ * Downsides of this method:
+ * - Copy-pasted code.
+ * - We process only known stream wrappers.
+ *
+ * @param string $uri
+ *
+ * @return string|null
+ */
+function _redirect_get_file_local_path($uri) {
+  $path = NULL;
+  if ($wrapper = file_stream_wrapper_get_instance_by_uri($uri)) {
+    if ($wrapper instanceof DrupalPublicStreamWrapper) {
+      $path = str_replace('\\', '/', _redirect_get_file_target($uri));
+      $path = $wrapper->getDirectoryPath() . '/' . drupal_encode_path($path);
+    }
+    elseif ($wrapper instanceof DrupalPrivateStreamWrapper) {
+      $path = str_replace('\\', '/', _redirect_get_file_target($uri));
+      $path = 'system/files/' . $path;
+    }
+  }
+  if ($path !== NULL) {
+    return rawurldecode($path);
+  }
+  return NULL;
+}
+
+/**
+ * Returns file target.
+ *
+ * This is a simplified version of DrupalLocalStreamWrapper::getTarget(). It
+ * exist only because the mentioned method has protected access.
+ *
+ * @param string $uri
+ *
+ * @return string
+ */
+function _redirect_get_file_target($uri) {
+  list($scheme, $target) = explode('://', $uri, 2);
+  return trim($target, '\/');
+}
+
+/**
+ * Implements of hook_file_update().
+ */
+function redirect_file_update($file) {
+  if ($file->uri !== $file->original->uri) {
+    $source = _redirect_get_file_local_path($file->original->uri);
+    $destination = _redirect_get_file_local_path($file->uri);
+    if ($destination !== NULL && $source !== NULL) {
+      $redirect = new stdClass();
+      redirect_object_prepare($redirect, array(
+        'source' => $source,
+        'redirect' => $destination,
+      ));
+      try {
+        redirect_save($redirect);
+        $saved = TRUE;
+      }
+      catch (Exception $e) {
+        $saved = FALSE;
+      }
+      if (
+        module_exists('file_entity') &&
+        (file_entity_access('update', $file) || file_entity_access('delete', $file))
+      ) {
+        if ($saved) {
+          drupal_set_message(t('Created redirect from %source to %destination for the file.', array(
+            '%source' => $source,
+            '%destination' => $destination,
+          )), 'status', FALSE);
+        }
+        else {
+          drupal_set_message(t('Cannot create redirect from %source to %destination for the file.', array(
+            '%source' => $source,
+            '%destination' => $destination,
+          )), 'warning', FALSE);
+        }
+      }
+    }
+  }
+}
+
+/**
  * Implements hook_redirect_operations().
  */
 function redirect_redirect_operations() {
